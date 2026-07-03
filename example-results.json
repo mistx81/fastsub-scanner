@@ -1,0 +1,35 @@
+[
+  {
+    "domain": "pypi.org",
+    "alive": true,
+    "status_code": 200,
+    "scheme": "https",
+    "server": "gunicorn"
+  },
+  {
+    "domain": "github.com",
+    "alive": true,
+    "status_code": 200,
+    "scheme": "https",
+    "server": "github.com"
+  },
+  {
+    "domain": "this-domain-should-not-exist-xyz123.com",
+    "alive": false,
+    "error": "Get \"http://this-domain-should-not-exist-xyz123.com\": dial tcp: lookup this-domain-should-not-exist-xyz123.com on 8.8.8.8:53: no such host"
+  },
+  {
+    "domain": "raw.githubusercontent.com",
+    "alive": true,
+    "status_code": 200,
+    "scheme": "https",
+    "server": "github.com"
+  },
+  {
+    "domain": "npmjs.com",
+    "alive": true,
+    "status_code": 403,
+    "scheme": "https",
+    "server": "cloudflare"
+  }
+]

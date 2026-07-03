@@ -1,0 +1,6 @@
+domain,alive,status_code,scheme,server,error
+pypi.org,true,200,https,gunicorn,
+github.com,true,200,https,github.com,
+this-domain-should-not-exist-xyz123.com,false,,,,"Get ""http://this-domain-should-not-exist-xyz123.com"": dial tcp: lookup this-domain-should-not-exist-xyz123.com on 8.8.8.8:53: no such host"
+raw.githubusercontent.com,true,200,https,github.com,
+npmjs.com,true,403,https,cloudflare,
