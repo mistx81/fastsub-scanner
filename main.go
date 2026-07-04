@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// Result يمثل نتيجة فحص نطاق واحد
+// Result represents the scan result for a single domain
 type Result struct {
 	Domain     string `json:"domain"`
 	Alive      bool   `json:"alive"`
@@ -27,11 +27,11 @@ type Result struct {
 func checkDomain(domain string, timeout time.Duration) Result {
 	client := http.Client{
 		Timeout: timeout,
-		// لا نتحقق من صحة الشهادة لأن الهدف هو سرعة الاستكشاف فقط
+		// Skip certificate verification since the goal is fast discovery
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
-		// لا تتبع أكثر من 5 تحويلات
+		// Don't follow more than 5 redirects
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
 				return http.ErrUseLastResponse
@@ -40,7 +40,7 @@ func checkDomain(domain string, timeout time.Duration) Result {
 		},
 	}
 
-	// نجرب https أولاً ثم http كخطة بديلة
+	// Try https first, then fall back to http
 	schemes := []string{"https", "http"}
 	var lastErr error
 
@@ -138,33 +138,33 @@ func exportCSV(results []Result, path string) error {
 }
 
 func main() {
-	inputFile := flag.String("l", "", "ملف يحتوي على قائمة النطاقات (سطر لكل نطاق) - إلزامي")
-	concurrency := flag.Int("c", 50, "عدد الفحوصات المتزامنة (Concurrency)")
-	timeoutSec := flag.Int("t", 5, "المهلة الزمنية بالثواني لكل طلب")
-	outJSON := flag.String("json", "", "مسار ملف JSON لتصدير النتائج (اختياري)")
-	outCSV := flag.String("csv", "", "مسار ملف CSV لتصدير النتائج (اختياري)")
-	showOnlyAlive := flag.Bool("alive-only", false, "عرض النطاقات الفعّالة فقط في الطرفية")
+	inputFile := flag.String("l", "", "File containing the list of domains (one per line) - required")
+	concurrency := flag.Int("c", 50, "Number of concurrent scans (Concurrency)")
+	timeoutSec := flag.Int("t", 5, "Timeout in seconds for each request")
+	outJSON := flag.String("json", "", "Path to export results as JSON (optional)")
+	outCSV := flag.String("csv", "", "Path to export results as CSV (optional)")
+	showOnlyAlive := flag.Bool("alive-only", false, "Show only alive domains in the console")
 	flag.Parse()
 
 	if *inputFile == "" {
-		fmt.Println("خطأ: يجب تحديد ملف النطاقات باستخدام -l")
-		fmt.Println("مثال: fastsub-scanner -l domains.txt -c 100 -json results.json")
+		fmt.Println("Error: you must specify a domain file using -l")
+		fmt.Println("Example: fastsub-scanner -l domains.txt -c 100 -json results.json")
 		os.Exit(1)
 	}
 
 	domains, err := readDomains(*inputFile)
 	if err != nil {
-		fmt.Printf("خطأ في قراءة الملف: %v\n", err)
+		fmt.Printf("Error reading file: %v\n", err)
 		os.Exit(1)
 	}
 
 	if len(domains) == 0 {
-		fmt.Println("الملف فارغ أو لا يحتوي على نطاقات صالحة.")
+		fmt.Println("The file is empty or contains no valid domains.")
 		os.Exit(1)
 	}
 
-	fmt.Printf("[*] تم تحميل %d نطاق للفحص\n", len(domains))
-	fmt.Printf("[*] عدد الخيوط المتزامنة: %d | المهلة: %ds\n\n", *concurrency, *timeoutSec)
+	fmt.Printf("[*] Loaded %d domain(s) to scan\n", len(domains))
+	fmt.Printf("[*] Concurrency: %d | Timeout: %ds\n\n", *concurrency, *timeoutSec)
 
 	start := time.Now()
 
@@ -172,19 +172,19 @@ func main() {
 	resultsCh := make(chan Result, len(domains))
 	var wg sync.WaitGroup
 
-	// إطلاق Worker Pool
+	// Launch the worker pool
 	for i := 0; i < *concurrency; i++ {
 		wg.Add(1)
 		go worker(i, jobs, resultsCh, time.Duration(*timeoutSec)*time.Second, &wg)
 	}
 
-	// تغذية القناة بالنطاقات
+	// Feed the channel with domains
 	for _, d := range domains {
 		jobs <- d
 	}
 	close(jobs)
 
-	// إغلاق قناة النتائج بعد انتهاء جميع الـ workers
+	// Close the results channel once all workers are done
 	go func() {
 		wg.Wait()
 		close(resultsCh)
@@ -205,22 +205,22 @@ func main() {
 
 	elapsed := time.Since(start)
 
-	fmt.Printf("\n[*] اكتمل الفحص في %s\n", elapsed.Round(time.Millisecond))
-	fmt.Printf("[*] النتيجة: %d فعّال / %d إجمالي\n", aliveCount, len(domains))
+	fmt.Printf("\n[*] Scan completed in %s\n", elapsed.Round(time.Millisecond))
+	fmt.Printf("[*] Result: %d alive / %d total\n", aliveCount, len(domains))
 
 	if *outJSON != "" {
 		if err := exportJSON(results, *outJSON); err != nil {
-			fmt.Printf("خطأ في تصدير JSON: %v\n", err)
+			fmt.Printf("Error exporting JSON: %v\n", err)
 		} else {
-			fmt.Printf("[+] تم حفظ النتائج في: %s\n", *outJSON)
+			fmt.Printf("[+] Results saved to: %s\n", *outJSON)
 		}
 	}
 
 	if *outCSV != "" {
 		if err := exportCSV(results, *outCSV); err != nil {
-			fmt.Printf("خطأ في تصدير CSV: %v\n", err)
+			fmt.Printf("Error exporting CSV: %v\n", err)
 		} else {
-			fmt.Printf("[+] تم حفظ النتائج في: %s\n", *outCSV)
+			fmt.Printf("[+] Results saved to: %s\n", *outCSV)
 		}
 	}
 }
